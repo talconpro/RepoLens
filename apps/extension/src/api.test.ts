@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type AnalysisRecord } from "@repolens/shared";
-import { deleteAnalysisRecords, getAnalysisRecord, listAnalysisRecords, loadSettings, normalizeApiBaseUrl, saveAnalysisRecord, saveSettings } from "./api";
+import {
+  deleteAnalysisRecords,
+  getAnalysisRecord,
+  listAnalysisRecords,
+  loadSettings,
+  normalizeApiBaseUrl,
+  saveAnalysisRecord,
+  saveSettings,
+  testGitHubConnection
+} from "./api";
 
 const storage = new Map<string, unknown>();
 
@@ -54,20 +63,62 @@ describe("extension settings", () => {
       apiBaseUrl: "https://api.openai.com/v1/",
       apiKey: " sk-test ",
       model: "gpt-4o-mini",
-      reportLanguage: "zh-en"
+      reportLanguage: "zh-en",
+      githubToken: " ghp-test "
     });
 
     await expect(loadSettings()).resolves.toEqual({
       apiBaseUrl: "https://api.openai.com/v1",
       apiKey: "sk-test",
       model: "gpt-4o-mini",
-      reportLanguage: "zh-en"
+      reportLanguage: "zh-en",
+      githubToken: "ghp-test"
     });
   });
 
   it("normalizes API base URLs", () => {
     expect(normalizeApiBaseUrl("https://example.com/v1///")).toBe("https://example.com/v1");
     expect(normalizeApiBaseUrl("")).toBe(DEFAULT_SETTINGS.apiBaseUrl);
+  });
+});
+
+describe("GitHub connection", () => {
+  it("tests GitHub quota with token authentication", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          resources: {
+            core: {
+              limit: 5000,
+              remaining: 4999,
+              reset: 1_779_408_000
+            }
+          }
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      testGitHubConnection({
+        ...DEFAULT_SETTINGS,
+        githubToken: " ghp-test "
+      })
+    ).resolves.toMatchObject({
+      authenticated: true,
+      limit: 5000,
+      remaining: 4999
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.github.com/rate_limit",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer ghp-test"
+        })
+      })
+    );
   });
 });
 

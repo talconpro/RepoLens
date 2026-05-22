@@ -1,8 +1,8 @@
-import { CheckCircle2, Loader2, Save, TestTube2, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Github, Loader2, Save, TestTube2, TriangleAlert } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 import type { ExtensionSettings } from "@repolens/shared";
 import { DEFAULT_SETTINGS } from "@repolens/shared";
-import { loadSettings, saveSettings, testConnection } from "../api";
+import { loadSettings, saveSettings, testConnection, testGitHubConnection } from "../api";
 
 type Status = { type: "idle" | "success" | "error" | "loading"; message: string };
 
@@ -28,13 +28,27 @@ export function OptionsApp() {
     }
   }
 
-  async function handleTest(): Promise<void> {
-    setStatus({ type: "loading", message: "正在测试连接..." });
+  async function handleTestAI(): Promise<void> {
+    setStatus({ type: "loading", message: "正在测试 AI 连接..." });
     try {
       await testConnection(settings);
-      setStatus({ type: "success", message: "连接成功。" });
+      setStatus({ type: "success", message: "AI 连接成功。" });
     } catch (error) {
-      setStatus({ type: "error", message: error instanceof Error ? error.message : "连接失败。" });
+      setStatus({ type: "error", message: error instanceof Error ? error.message : "AI 连接失败。" });
+    }
+  }
+
+  async function handleTestGitHub(): Promise<void> {
+    setStatus({ type: "loading", message: "正在测试 GitHub 连接..." });
+    try {
+      const result = await testGitHubConnection(settings);
+      const mode = result.authenticated ? "Token 认证额度" : "匿名额度";
+      setStatus({
+        type: "success",
+        message: `GitHub 连接成功，当前使用${mode}，剩余 ${result.remaining}/${result.limit}，重置时间：${result.resetAt}。`
+      });
+    } catch (error) {
+      setStatus({ type: "error", message: error instanceof Error ? error.message : "GitHub 连接失败。" });
     }
   }
 
@@ -45,58 +59,81 @@ export function OptionsApp() {
           <span className="brand-mark">R</span>
           <div>
             <h1 className="options-title">RepoLens 设置</h1>
-            <p className="subtitle">配置 OpenAI 兼容接口，用于在插件内直接生成报告。</p>
+            <p className="subtitle">配置 AI 接口和 GitHub API 访问方式，所有密钥仅保存在本地浏览器。</p>
           </div>
         </div>
 
         <form className="settings-form" onSubmit={(event) => void handleSave(event)}>
-          <label className="field">
-            <span>API Base URL</span>
-            <input
-              value={settings.apiBaseUrl}
-              placeholder="https://api.openai.com/v1"
-              onChange={(event) => setSettings({ ...settings, apiBaseUrl: event.target.value })}
-            />
-          </label>
+          <div className="settings-section">
+            <h2>AI 分析</h2>
+            <label className="field">
+              <span>API Base URL</span>
+              <input
+                value={settings.apiBaseUrl}
+                placeholder="https://api.openai.com/v1"
+                onChange={(event) => setSettings({ ...settings, apiBaseUrl: event.target.value })}
+              />
+            </label>
 
-          <label className="field">
-            <span>API Key</span>
-            <input
-              value={settings.apiKey}
-              placeholder="sk-xxxxxxxx"
-              type="password"
-              onChange={(event) => setSettings({ ...settings, apiKey: event.target.value })}
-            />
-          </label>
+            <label className="field">
+              <span>API Key</span>
+              <input
+                value={settings.apiKey}
+                placeholder="sk-xxxxxxxx"
+                type="password"
+                onChange={(event) => setSettings({ ...settings, apiKey: event.target.value })}
+              />
+            </label>
 
-          <label className="field">
-            <span>Model</span>
-            <input
-              value={settings.model}
-              placeholder="gpt-4o-mini"
-              onChange={(event) => setSettings({ ...settings, model: event.target.value })}
-            />
-          </label>
+            <label className="field">
+              <span>Model</span>
+              <input
+                value={settings.model}
+                placeholder="gpt-4o-mini"
+                onChange={(event) => setSettings({ ...settings, model: event.target.value })}
+              />
+            </label>
 
-          <label className="field">
-            <span>报告语言</span>
-            <select
-              value={settings.reportLanguage}
-              onChange={(event) => setSettings({ ...settings, reportLanguage: event.target.value === "zh-en" ? "zh-en" : "zh-CN" })}
-            >
-              <option value="zh-CN">中文</option>
-              <option value="zh-en">中英双语</option>
-            </select>
-          </label>
+            <label className="field">
+              <span>报告语言</span>
+              <select
+                value={settings.reportLanguage}
+                onChange={(event) => setSettings({ ...settings, reportLanguage: event.target.value === "zh-en" ? "zh-en" : "zh-CN" })}
+              >
+                <option value="zh-CN">中文</option>
+                <option value="zh-en">中英双语</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="settings-section">
+            <h2>GitHub 数据抓取</h2>
+            <label className="field">
+              <span>GitHub Token（可选）</span>
+              <input
+                value={settings.githubToken}
+                placeholder="github_pat_... 或 ghp_..."
+                type="password"
+                onChange={(event) => setSettings({ ...settings, githubToken: event.target.value })}
+              />
+            </label>
+            <p className="field-help">
+              不填时使用匿名 GitHub API，通常每 IP 每小时 60 次请求；填写 token 后可提升到用户认证额度。公开仓库分析不需要私有仓库权限。
+            </p>
+          </div>
 
           <div className="toolbar">
             <button className="secondary-button" type="submit" disabled={status.type === "loading"}>
               <Save size={16} />
               保存配置
             </button>
-            <button className="ghost-button" type="button" disabled={status.type === "loading"} onClick={() => void handleTest()}>
+            <button className="ghost-button" type="button" disabled={status.type === "loading"} onClick={() => void handleTestAI()}>
               <TestTube2 size={16} />
-              测试连接
+              测试 AI 连接
+            </button>
+            <button className="ghost-button" type="button" disabled={status.type === "loading"} onClick={() => void handleTestGitHub()}>
+              <Github size={16} />
+              测试 GitHub 连接
             </button>
           </div>
         </form>

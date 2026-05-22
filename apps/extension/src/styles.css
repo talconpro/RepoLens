@@ -334,6 +334,25 @@ button {
   margin-top: 24px;
 }
 
+.settings-section {
+  border-top: 1px solid #e5e7eb;
+  display: grid;
+  gap: 16px;
+  padding-top: 18px;
+}
+
+.settings-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.settings-section h2 {
+  color: #172033;
+  font-size: 15px;
+  letter-spacing: 0;
+  margin: 0;
+}
+
 .field {
   display: grid;
   gap: 7px;
@@ -361,6 +380,13 @@ button {
   border-color: #0f766e;
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
   outline: none;
+}
+
+.field-help {
+  color: #607087;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: -6px 0 0;
 }
 
 .history-page {

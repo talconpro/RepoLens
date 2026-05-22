@@ -121,7 +121,7 @@ export function HistoryApp() {
       <section className="history-controls">
         <label className="search-box">
           <Search size={16} />
-          <input value={query} placeholder="按组织/仓库搜索，例如 openai/gpt" onChange={(event) => setQuery(event.target.value)} />
+          <input value={query} placeholder="按组织/仓库搜索，例如 talconpro/RepoLens" onChange={(event) => setQuery(event.target.value)} />
         </label>
         <div className="toolbar">
           <button className="ghost-button" type="button" disabled={visibleIds.length === 0} onClick={toggleVisibleSelection}>

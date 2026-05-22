@@ -18,6 +18,7 @@ export interface ExtensionSettings {
   apiKey: string;
   model: string;
   reportLanguage: ReportLanguage;
+  githubToken: string;
 }
 
 export interface RepoInfo {
@@ -94,7 +95,8 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   apiBaseUrl: "https://api.openai.com/v1",
   apiKey: "",
   model: "gpt-4o-mini",
-  reportLanguage: "zh-CN"
+  reportLanguage: "zh-CN",
+  githubToken: ""
 };
 
 export const ANALYSIS_LIMITS = {

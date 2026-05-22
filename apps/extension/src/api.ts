@@ -47,12 +47,29 @@ interface GitHubContentApiResponse {
   content?: string;
 }
 
+interface GitHubRateLimitResponse {
+  resources?: {
+    core?: {
+      limit: number;
+      remaining: number;
+      reset: number;
+    };
+  };
+}
+
 interface OpenAIChatResponse {
   choices?: Array<{
     message?: {
       content?: string;
     };
   }>;
+}
+
+export interface GitHubConnectionResult {
+  authenticated: boolean;
+  limit: number;
+  remaining: number;
+  resetAt: string;
 }
 
 export async function loadSettings(): Promise<ExtensionSettings> {
@@ -63,7 +80,8 @@ export async function loadSettings(): Promise<ExtensionSettings> {
     apiBaseUrl: normalizeApiBaseUrl(settings?.apiBaseUrl ?? DEFAULT_SETTINGS.apiBaseUrl),
     apiKey: settings?.apiKey ?? DEFAULT_SETTINGS.apiKey,
     model: settings?.model ?? DEFAULT_SETTINGS.model,
-    reportLanguage: normalizeReportLanguage(settings?.reportLanguage)
+    reportLanguage: normalizeReportLanguage(settings?.reportLanguage),
+    githubToken: settings?.githubToken ?? DEFAULT_SETTINGS.githubToken
   };
 }
 
@@ -72,7 +90,8 @@ export async function saveSettings(settings: ExtensionSettings): Promise<void> {
     apiBaseUrl: normalizeApiBaseUrl(settings.apiBaseUrl),
     apiKey: settings.apiKey.trim(),
     model: settings.model.trim() || DEFAULT_SETTINGS.model,
-    reportLanguage: normalizeReportLanguage(settings.reportLanguage)
+    reportLanguage: normalizeReportLanguage(settings.reportLanguage),
+    githubToken: settings.githubToken.trim()
   };
 
   await chrome.storage.local.set({ [SETTINGS_KEY]: normalized });
@@ -100,6 +119,34 @@ export async function testConnection(settings: ExtensionSettings): Promise<void>
   if (!response.ok) {
     throw new Error(`连接失败：${response.status} ${response.statusText || "请检查 API Key 或 Base URL"}`);
   }
+}
+
+export async function testGitHubConnection(settings: ExtensionSettings): Promise<GitHubConnectionResult> {
+  const githubToken = settings.githubToken.trim();
+  const response = await fetch("https://api.github.com/rate_limit", {
+    headers: githubHeaders(githubToken)
+  });
+
+  if (response.status === 401) {
+    throw new Error("GitHub Token 无效或已过期，请重新生成后保存。");
+  }
+
+  if (response.status === 403) {
+    throw createGitHubRateLimitError(response, Boolean(githubToken));
+  }
+
+  if (!response.ok) {
+    throw new Error(`GitHub 连接失败：${response.status} ${response.statusText || "请稍后重试"}`);
+  }
+
+  const data = (await response.json()) as GitHubRateLimitResponse;
+  const core = data.resources?.core;
+  return {
+    authenticated: Boolean(githubToken),
+    limit: core?.limit ?? 0,
+    remaining: core?.remaining ?? 0,
+    resetAt: core?.reset ? new Date(core.reset * 1000).toLocaleString() : "未知"
+  };
 }
 
 export async function analyzeRepository(repo: RepoRef): Promise<AnalysisRecord> {
@@ -407,14 +454,22 @@ async function getFiles(repo: RepoRef, branch: string, paths: string[], maxChars
 }
 
 async function githubRequest<T>(path: string): Promise<T> {
+  const settings = await loadSettings();
+  const githubToken = settings.githubToken.trim();
   const response = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Accept: "application/vnd.github+json"
-    }
+    headers: githubHeaders(githubToken)
   });
 
   if (response.status === 404) {
     throw new Error("无法获取该仓库信息，请检查仓库是否存在或是否为公开仓库。");
+  }
+
+  if (response.status === 401) {
+    throw new Error("GitHub Token 无效或已过期，请在设置页更新后重试。");
+  }
+
+  if (response.status === 403) {
+    throw createGitHubRateLimitError(response, Boolean(githubToken));
   }
 
   if (response.status === 403) {
@@ -426,6 +481,33 @@ async function githubRequest<T>(path: string): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+function githubHeaders(githubToken: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28"
+  };
+
+  if (githubToken) {
+    headers.Authorization = `Bearer ${githubToken}`;
+  }
+
+  return headers;
+}
+
+function createGitHubRateLimitError(response: Response, authenticated: boolean): Error {
+  const remaining = response.headers.get("x-ratelimit-remaining");
+  const reset = response.headers.get("x-ratelimit-reset");
+  const resetText = reset ? `，额度将在 ${new Date(Number(reset) * 1000).toLocaleString()} 重置` : "";
+
+  if (remaining === "0") {
+    const mode = authenticated ? "GitHub Token" : "GitHub 匿名";
+    const hint = authenticated ? "请稍后重试，或检查 token 是否属于高频共享账号。" : "请稍后重试，或在设置页配置 GitHub Token 提升额度。";
+    return new Error(`${mode} API 请求额度已用尽${resetText}。${hint}`);
+  }
+
+  return new Error("GitHub API 请求受限，可能触发了 GitHub 二级限流。请稍后重试，或在设置页配置/更换 GitHub Token。");
 }
 
 async function ensureHostPermission(apiBaseUrl: string): Promise<void> {

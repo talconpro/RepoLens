@@ -57,7 +57,8 @@ async function initializeBackground(): Promise<void> {
     apiBaseUrl: settings.apiBaseUrl || DEFAULT_SETTINGS.apiBaseUrl,
     apiKey: settings.apiKey,
     model: settings.model || DEFAULT_SETTINGS.model,
-    reportLanguage: settings.reportLanguage || DEFAULT_SETTINGS.reportLanguage
+    reportLanguage: settings.reportLanguage || DEFAULT_SETTINGS.reportLanguage,
+    githubToken: settings.githubToken || DEFAULT_SETTINGS.githubToken
   });
   await chrome.storage.local.set({
     repolensInstalledAt: new Date().toISOString()
