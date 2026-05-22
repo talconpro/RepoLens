@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.vite/
+.env
+.env.*
+!.env.example
+coverage/
+release/*.zip
+*.log
+pnpm-debug.log*
+.DS_Store
+Thumbs.db

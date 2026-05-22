@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "RepoLens",
+  "description": "Generate readable learning reports for public GitHub repositories.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "RepoLens",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "storage", "tabs"],
+  "host_permissions": ["https://github.com/*", "https://api.github.com/*", "https://api.openai.com/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"]
+}

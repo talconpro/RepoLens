@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RepoLens - GitHub 项目速读插件</title>
+    <meta
+      name="description"
+      content="RepoLens 是一个 Chrome 扩展，用 OpenAI 兼容接口把 GitHub 公开仓库生成可阅读、可导出的项目学习报告。"
+    />
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#">
+        <span class="brand-mark">R</span>
+        <span>RepoLens</span>
+      </a>
+      <nav>
+        <a href="#features">功能</a>
+        <a href="#install">安装</a>
+        <a href="#privacy">隐私</a>
+        <a data-repo-link href="https://github.com/">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Chrome MV3 Extension</p>
+          <h1>RepoLens</h1>
+          <p class="lead">打开任意 GitHub 公开仓库，一键生成项目概览、技术栈、关键文件导读和学习路线。</p>
+          <div class="hero-actions">
+            <a class="primary-action" data-release-link href="https://github.com/">下载扩展包</a>
+            <a class="secondary-action" href="#install">查看安装方式</a>
+          </div>
+        </div>
+        <div class="product-preview" aria-label="RepoLens report preview">
+          <div class="preview-topbar">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="preview-body">
+            <aside>
+              <strong>项目报告</strong>
+              <a>项目概览</a>
+              <a>技术栈分析</a>
+              <a>关键文件导读</a>
+              <a>学习路线</a>
+            </aside>
+            <section>
+              <p class="preview-label">GitHub 项目分析报告</p>
+              <h2>owner/repo</h2>
+              <div class="metric-row">
+                <span>TypeScript</span>
+                <span>12.4k stars</span>
+                <span>MIT</span>
+              </div>
+              <p>这个项目主要解决什么问题，适合谁学习，应该从哪些文件开始阅读。</p>
+              <div class="file-card">src/index.ts - 入口流程与核心导出</div>
+              <div class="file-card">packages/core - 核心模块实现</div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">What it does</p>
+          <h2>把陌生仓库变成可阅读的学习地图</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <h3>仓库速读</h3>
+            <p>读取 README、目录结构、配置文件和关键源码抽样，帮助你快速建立项目全局视图。</p>
+          </article>
+          <article>
+            <h3>AI 分析报告</h3>
+            <p>使用你配置的 OpenAI 兼容接口生成结构化报告，支持中文和中英双语。</p>
+          </article>
+          <article>
+            <h3>本地历史</h3>
+            <p>分析结果保存在浏览器本地，可从历史页再次打开报告或回到 GitHub 仓库。</p>
+          </article>
+          <article>
+            <h3>导出沉淀</h3>
+            <p>报告支持 Markdown 和 HTML 下载，适合学习记录、团队分享和内容整理。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="install" class="section install-section">
+        <div class="section-heading">
+          <p class="eyebrow">Install</p>
+          <h2>安装和使用</h2>
+        </div>
+        <ol class="steps">
+          <li>从 GitHub Release 下载 `repolens-extension-v*.zip` 并解压。</li>
+          <li>打开 Chrome 的 `chrome://extensions`，启用开发者模式。</li>
+          <li>点击“加载已解压的扩展程序”，选择解压后的扩展目录。</li>
+          <li>打开 RepoLens 设置页，填写 API Base URL、API Key 和模型名。</li>
+          <li>进入 GitHub 公开仓库页面，点击插件图标并开始分析。</li>
+        </ol>
+      </section>
+
+      <section id="privacy" class="section privacy-panel">
+        <div>
+          <p class="eyebrow">Privacy</p>
+          <h2>API Key 和报告都留在你的浏览器里</h2>
+        </div>
+        <p>
+          RepoLens 不提供自建后端。插件直接读取公开 GitHub API，并直接调用你配置的 OpenAI 兼容接口。
+          API Key 与历史报告保存在 `chrome.storage.local`。
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <span>RepoLens</span>
+      <a data-repo-link href="https://github.com/">GitHub</a>
+      <a data-release-link href="https://github.com/">Releases</a>
+    </footer>
+
+    <script>
+      const owner = location.hostname.endsWith(".github.io") ? location.hostname.replace(".github.io", "") : "";
+      const repo = location.pathname.split("/").filter(Boolean)[0] || "RepoLens";
+      const repoUrl = owner ? `https://github.com/${owner}/${repo}` : "https://github.com/";
+      document.querySelectorAll("[data-repo-link]").forEach((link) => {
+        link.href = repoUrl;
+      });
+      document.querySelectorAll("[data-release-link]").forEach((link) => {
+        link.href = `${repoUrl}/releases`;
+      });
+    </script>
+  </body>
+</html>
