@@ -16,13 +16,14 @@ RepoLens 是一个 Chrome MV3 浏览器插件，用于在浏览 GitHub 公开仓
 
 ## 在线主页
 
-项目主页使用 GitHub Pages 部署，源码位于 `docs/`。
+项目主页使用 GitHub Pages 的 `Deploy from a branch` 模式部署，源码位于 `docs/`。
 
 启用方式：
 
 1. 打开 GitHub 仓库 `Settings -> Pages`。
-2. 将 Source 设置为 `GitHub Actions`。
-3. 合并到 `main` 后，`.github/workflows/pages.yml` 会自动部署 `docs` 目录。
+2. 将 Source 设置为 `Deploy from a branch`。
+3. Branch 选择 `main`，目录选择 `/docs`。
+4. 保存后，合并到 `main` 的 `docs/` 内容会自动作为项目主页发布。
 
 ## 安装插件
 
@@ -108,16 +109,16 @@ release/repolens-extension-v0.1.0.zip
 
 ## 自动化流程
 
-仓库包含三条 GitHub Actions：
+仓库包含两条 GitHub Actions：
 
 - `.github/workflows/ci.yml`
   - push / PR 时运行测试、构建、扩展打包。
   - 上传 `release/*.zip` 作为 workflow artifact。
-- `.github/workflows/pages.yml`
-  - `main` 分支更新 `docs/**`、`README.md` 或 workflow 文件时部署 GitHub Pages。
 - `.github/workflows/release.yml`
   - 推送 `v*` tag 时创建 GitHub Release。
   - 自动上传扩展 zip。
+
+GitHub Pages 不使用 workflow，直接在仓库设置中选择 `main / docs` 分支部署。
 
 发布新版本示例：
 

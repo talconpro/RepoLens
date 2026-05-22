@@ -102,6 +102,11 @@ export async function testConnection(settings: ExtensionSettings): Promise<void>
 }
 
 export async function analyzeRepository(repo: RepoRef): Promise<AnalysisRecord> {
+  const processingRecord = await createAnalysisRecord(repo);
+  return completeAnalysisRecord(processingRecord, repo);
+}
+
+export async function createAnalysisRecord(repo: RepoRef): Promise<AnalysisRecord> {
   const settings = await loadSettings();
   if (!settings.apiKey) {
     throw new Error("请先在设置页填写 API Key。");
@@ -120,7 +125,17 @@ export async function analyzeRepository(repo: RepoRef): Promise<AnalysisRecord> 
   };
   await saveAnalysisRecord(processingRecord);
 
+  return processingRecord;
+}
+
+export async function completeAnalysisRecord(processingRecord: AnalysisRecord, repo: RepoRef): Promise<AnalysisRecord> {
   try {
+    const settings = await loadSettings();
+    if (!settings.apiKey) {
+      throw new Error("请先在设置页填写 API Key。");
+    }
+
+    await ensureHostPermission(settings.apiBaseUrl);
     const snapshot = await fetchGitHubRepoSnapshot(repo);
     const draft = await analyzeWithOpenAICompatible(snapshot, settings);
     const result = completeAnalysisResult(snapshot.repoInfo, new Date().toISOString(), draft);

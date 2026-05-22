@@ -1,7 +1,8 @@
 import { BookOpen, CheckCircle2, ExternalLink, History, Loader2, Play, Settings, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { parseGitHubRepoUrl } from "@repolens/shared";
-import { analyzeRepository, loadSettings, openHistoryPage, openOptionsPage } from "../api";
+import { loadSettings, openHistoryPage, openOptionsPage } from "../api";
+import { START_ANALYSIS_MESSAGE, type StartAnalysisResponse } from "../messages";
 
 type PopupState = "idle" | "loading" | "success" | "error";
 
@@ -49,10 +50,16 @@ export function PopupApp() {
     setMessage("正在读取仓库并生成报告...");
 
     try {
-      const record = await analyzeRepository(repo);
+      const response = (await chrome.runtime.sendMessage({
+        type: START_ANALYSIS_MESSAGE,
+        repo
+      })) as StartAnalysisResponse;
+      if (!response.ok || !response.record) {
+        throw new Error(response.message ?? "分析任务启动失败。");
+      }
       setState("success");
       setMessage("分析完成，正在打开报告页。");
-      await chrome.tabs.create({ url: chrome.runtime.getURL(`report.html?id=${record.analysisId}`) });
+      await chrome.tabs.create({ url: chrome.runtime.getURL(`report.html?id=${response.record.analysisId}`) });
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "项目分析失败，请重新发起分析。");

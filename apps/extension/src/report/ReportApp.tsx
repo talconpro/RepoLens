@@ -22,36 +22,50 @@ const sections = [
 export function ReportApp() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string>("");
+  const [loadingMessage, setLoadingMessage] = useState<string>("正在加载报告...");
   const [downloading, setDownloading] = useState<"md" | "html" | null>(null);
   const analysisId = useMemo(() => new URLSearchParams(window.location.search).get("id") ?? "", []);
 
   useEffect(() => {
-    void loadReport();
+    let cancelled = false;
+
+    async function pollReport(): Promise<void> {
+      const shouldContinue = await loadReport();
+      if (!cancelled && shouldContinue) {
+        window.setTimeout(pollReport, 1500);
+      }
+    }
+
+    void pollReport();
+    return () => {
+      cancelled = true;
+    };
   }, [analysisId]);
 
-  async function loadReport(): Promise<void> {
+  async function loadReport(): Promise<boolean> {
     if (!analysisId) {
       setError("缺少分析任务 ID。");
-      return;
+      return false;
     }
 
     const record = await getAnalysisRecord(analysisId);
     if (!record) {
-      setError("未找到该分析报告。");
-      return;
+      setLoadingMessage("分析任务正在初始化...");
+      return true;
     }
 
     if (record.status === "failed") {
       setError(record.error?.message ?? "项目分析失败，请重新发起分析。");
-      return;
+      return false;
     }
 
     if (record.status !== "success" || !record.result) {
-      setError("分析尚未完成，请稍后重新打开报告页。");
-      return;
+      setLoadingMessage("正在后台分析项目，完成后会自动显示报告...");
+      return true;
     }
 
     setResult(record.result);
+    return false;
   }
 
   async function handleDownload(type: "md" | "html"): Promise<void> {
@@ -124,7 +138,7 @@ export function ReportApp() {
         <section className="report-layout">
           <div className="report-content">
             <p className="status-row">
-              <Loader2 size={16} /> 正在加载报告...
+              <Loader2 size={16} /> {loadingMessage}
             </p>
           </div>
         </section>

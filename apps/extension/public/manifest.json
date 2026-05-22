@@ -12,7 +12,7 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["activeTab", "storage", "tabs"],
+  "permissions": ["activeTab", "alarms", "storage", "tabs"],
   "host_permissions": ["https://github.com/*", "https://api.github.com/*", "https://api.openai.com/*"],
   "optional_host_permissions": ["https://*/*", "http://*/*"]
 }
