@@ -19,6 +19,7 @@ import {
 const SETTINGS_KEY = "repolens.settings";
 const LATEST_ANALYSIS_KEY = "repolens.latestAnalysisId";
 const HISTORY_KEY = "repolens.analysisHistory";
+const QUEUE_KEY = "repolens.analysisQueue";
 
 interface GitHubRepoApiResponse {
   name: string;
@@ -263,6 +264,24 @@ export async function listAnalysisRecords(): Promise<AnalysisRecord[]> {
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
 }
 
+export async function deleteAnalysisRecords(analysisIds: string[]): Promise<void> {
+  const uniqueIds = Array.from(new Set(analysisIds));
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const [history, queue] = await Promise.all([loadHistoryIds(), loadQueue()]);
+  uniqueIds.forEach((analysisId) => {
+    delete queue[analysisId];
+  });
+
+  await chrome.storage.local.remove(uniqueIds.map(analysisKey));
+  await chrome.storage.local.set({
+    [HISTORY_KEY]: history.filter((analysisId) => !uniqueIds.includes(analysisId)),
+    [QUEUE_KEY]: queue
+  });
+}
+
 export async function getMarkdown(analysisId: string): Promise<string> {
   const record = await requireSuccessfulRecord(analysisId);
   return record.result.markdown;
@@ -295,6 +314,12 @@ async function loadHistoryIds(): Promise<string[]> {
   const stored = await chrome.storage.local.get(HISTORY_KEY);
   const value = stored[HISTORY_KEY];
   return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : [];
+}
+
+async function loadQueue(): Promise<Record<string, RepoRef>> {
+  const stored = await chrome.storage.local.get(QUEUE_KEY);
+  const value = stored[QUEUE_KEY];
+  return typeof value === "object" && value !== null ? (value as Record<string, RepoRef>) : {};
 }
 
 async function loadAllStoredAnalysisRecords(): Promise<AnalysisRecord[]> {

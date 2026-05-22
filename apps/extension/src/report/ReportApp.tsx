@@ -1,9 +1,11 @@
-import { FileCode2, FileText, History, ImageOff, Loader2, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import type { AnalysisResult } from "@repolens/shared";
-import { createReportFilename } from "@repolens/shared";
+import { FileCode2, FileText, History, ImageDown, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { toPng } from "html-to-image";
+import type { AnalysisRecord, AnalysisResult } from "@repolens/shared";
+import { createReportFilename, parseGitHubRepoUrl } from "@repolens/shared";
 import { getAnalysisRecord, getHtml, getMarkdown, openHistoryPage } from "../api";
 import { downloadTextFile } from "../download";
+import { START_ANALYSIS_MESSAGE, type StartAnalysisResponse } from "../messages";
 
 const sections = [
   ["overview", "项目概览"],
@@ -20,10 +22,13 @@ const sections = [
 ] as const;
 
 export function ReportApp() {
+  const [record, setRecord] = useState<AnalysisRecord | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string>("");
   const [loadingMessage, setLoadingMessage] = useState<string>("正在加载报告...");
-  const [downloading, setDownloading] = useState<"md" | "html" | null>(null);
+  const [downloading, setDownloading] = useState<"md" | "html" | "png" | null>(null);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const reportRef = useRef<HTMLElement | null>(null);
   const analysisId = useMemo(() => new URLSearchParams(window.location.search).get("id") ?? "", []);
 
   useEffect(() => {
@@ -48,27 +53,28 @@ export function ReportApp() {
       return false;
     }
 
-    const record = await getAnalysisRecord(analysisId);
-    if (!record) {
+    const nextRecord = await getAnalysisRecord(analysisId);
+    setRecord(nextRecord);
+    if (!nextRecord) {
       setLoadingMessage("分析任务正在初始化...");
       return true;
     }
 
-    if (record.status === "failed") {
-      setError(record.error?.message ?? "项目分析失败，请重新发起分析。");
+    if (nextRecord.status === "failed") {
+      setError(nextRecord.error?.message ?? "项目分析失败，请重新发起分析。");
       return false;
     }
 
-    if (record.status !== "success" || !record.result) {
+    if (nextRecord.status !== "success" || !nextRecord.result) {
       setLoadingMessage("正在后台分析项目，完成后会自动显示报告...");
       return true;
     }
 
-    setResult(record.result);
+    setResult(nextRecord.result);
     return false;
   }
 
-  async function handleDownload(type: "md" | "html"): Promise<void> {
+  async function handleDownload(type: "md" | "html" | "png"): Promise<void> {
     if (!result) {
       return;
     }
@@ -79,12 +85,44 @@ export function ReportApp() {
       if (type === "md") {
         const markdown = await getMarkdown(analysisId);
         downloadTextFile(createReportFilename(owner, repo, "md"), markdown, "text/markdown;charset=utf-8");
-      } else {
+      } else if (type === "html") {
         const html = await getHtml(analysisId);
         downloadTextFile(createReportFilename(owner, repo, "html"), html, "text/html;charset=utf-8");
+      } else if (reportRef.current) {
+        const dataUrl = await toPng(reportRef.current, {
+          cacheBust: true,
+          pixelRatio: 2,
+          backgroundColor: "#ffffff"
+        });
+        downloadDataUrl(createReportFilename(owner, repo, "png"), dataUrl);
       }
     } finally {
       setDownloading(null);
+    }
+  }
+
+  async function handleReanalyze(): Promise<void> {
+    const repoUrl = result?.repoInfo.htmlUrl ?? record?.repoUrl;
+    const repo = repoUrl ? parseGitHubRepoUrl(repoUrl) : null;
+    if (!repo) {
+      setError("无法识别当前报告对应的 GitHub 仓库。");
+      return;
+    }
+
+    setReanalyzing(true);
+    try {
+      const response = (await chrome.runtime.sendMessage({
+        type: START_ANALYSIS_MESSAGE,
+        repo
+      })) as StartAnalysisResponse;
+      if (!response.ok || !response.record) {
+        throw new Error(response.message ?? "重新分析启动失败。");
+      }
+      window.location.href = `report.html?id=${response.record.analysisId}`;
+    } catch (reanalyzeError) {
+      setError(reanalyzeError instanceof Error ? reanalyzeError.message : "重新分析启动失败。");
+    } finally {
+      setReanalyzing(false);
     }
   }
 
@@ -96,6 +134,10 @@ export function ReportApp() {
           <p className="muted">{result ? `生成时间：${new Date(result.generatedAt).toLocaleString()}` : "正在准备报告内容"}</p>
         </div>
         <div className="toolbar">
+          <button className="ghost-button" type="button" disabled={reanalyzing || (!result && !record)} onClick={() => void handleReanalyze()}>
+            <RefreshCw size={16} />
+            重新分析
+          </button>
           <button className="secondary-button" type="button" disabled={!result || downloading === "md"} onClick={() => void handleDownload("md")}>
             <FileText size={16} />
             Markdown
@@ -104,8 +146,8 @@ export function ReportApp() {
             <FileCode2 size={16} />
             HTML
           </button>
-          <button className="ghost-button" type="button" disabled title="PNG 导出将在后续版本提供">
-            <ImageOff size={16} />
+          <button className="secondary-button" type="button" disabled={!result || downloading === "png"} onClick={() => void handleDownload("png")}>
+            <ImageDown size={16} />
             PNG
           </button>
           <button className="ghost-button" type="button" onClick={() => void openHistoryPage()}>
@@ -132,7 +174,7 @@ export function ReportApp() {
               </a>
             ))}
           </nav>
-          <ReportContent result={result} />
+          <ReportContent ref={reportRef} result={result} />
         </section>
       ) : (
         <section className="report-layout">
@@ -147,9 +189,9 @@ export function ReportApp() {
   );
 }
 
-function ReportContent({ result }: { result: AnalysisResult }) {
+const ReportContent = forwardRef<HTMLElement, { result: AnalysisResult }>(function ReportContent({ result }, ref) {
   return (
-    <article className="report-content">
+    <article className="report-content" ref={ref}>
       <h1>GitHub 项目分析报告：{result.repoInfo.fullName}</h1>
       <div className="metric-grid">
         <Metric label="主要语言" value={result.repoInfo.language ?? "无法确认"} />
@@ -213,7 +255,7 @@ function ReportContent({ result }: { result: AnalysisResult }) {
       <p>{result.conclusion}</p>
     </article>
   );
-}
+});
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
@@ -232,4 +274,13 @@ function List({ items }: { items: string[] }) {
       ))}
     </ul>
   );
+}
+
+function downloadDataUrl(filename: string, dataUrl: string): void {
+  const anchor = document.createElement("a");
+  anchor.href = dataUrl;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
 }

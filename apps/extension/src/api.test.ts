@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, type AnalysisRecord } from "@repolens/shared";
-import { getAnalysisRecord, listAnalysisRecords, loadSettings, normalizeApiBaseUrl, saveAnalysisRecord, saveSettings } from "./api";
+import { deleteAnalysisRecords, getAnalysisRecord, listAnalysisRecords, loadSettings, normalizeApiBaseUrl, saveAnalysisRecord, saveSettings } from "./api";
 
 const storage = new Map<string, unknown>();
 
@@ -17,6 +17,10 @@ beforeEach(() => {
         },
         async set(values: Record<string, unknown>) {
           Object.entries(values).forEach(([key, value]) => storage.set(key, value));
+        },
+        async remove(keys: string | string[]) {
+          const list = Array.isArray(keys) ? keys : [keys];
+          list.forEach((key) => storage.delete(key));
         }
       }
     },
@@ -103,5 +107,21 @@ describe("analysis storage", () => {
 
     const history = await listAnalysisRecords();
     expect(history.map((record) => record.analysisId)).toEqual(["analysis_first", "analysis_second"]);
+  });
+
+  it("deletes analysis records from storage and history", async () => {
+    const record: AnalysisRecord = {
+      analysisId: "analysis_delete",
+      repoUrl: "https://github.com/owner/delete-me",
+      status: "processing",
+      createdAt: "2026-05-22T00:00:00.000Z",
+      updatedAt: "2026-05-22T00:00:00.000Z"
+    };
+
+    await saveAnalysisRecord(record);
+    await deleteAnalysisRecords([record.analysisId]);
+
+    await expect(getAnalysisRecord(record.analysisId)).resolves.toBeNull();
+    await expect(listAnalysisRecords()).resolves.toEqual([]);
   });
 });
